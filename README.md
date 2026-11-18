@@ -1,40 +1,25 @@
 # bitss-pagos
 
-Microservicio **Pagos** de BITSS. Spring Boot 4 / Java 21, puerto `8085`, base de datos `pagos_db`.
+Microservicio `pagos` de BITSS. Puerto `8085`, base de datos `pagos_db`.
 
-Ruta publicada en el API Gateway de AWS: `/pagos`.
+## Despliegue
 
-## Flujo del workflow
+El workflow `.github/workflows/ci-cd.yml` ejecuta pruebas, publica la imagen en Amazon ECR y despliega únicamente este servicio en su instancia EC2 mediante AWS Systems Manager.
 
-`.github/workflows/ci-cd.yml` se ejecuta en cada push a `main`:
+Configura estos secrets en el repositorio:
 
-1. **Pruebas**: levanta un MySQL de servicio y corre `mvn verify`.
-2. **Imagen en Docker Hub**: construye y publica `<usuario>/bitss-pagos:latest` y `<usuario>/bitss-pagos:<sha>`.
-3. **Despliegue en AWS**: por SSM, la instancia EC2 descarga la imagen y recrea el contenedor `pagos` dentro de la red `bitss-net`.
+| Secret | Uso |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | Credencial IAM para GitHub Actions |
+| `AWS_SECRET_ACCESS_KEY` | Credencial IAM para GitHub Actions |
+| `AWS_SESSION_TOKEN` | Solo para credenciales temporales |
+| `AWS_REGION` | Región AWS, por ejemplo `us-east-1` |
+| `INSTANCE_ID` | ID de la instancia EC2 asignada al servicio |
 
-En un pull request solo corre el job de pruebas.
+La instancia debe tener un rol IAM con `AmazonSSMManagedInstanceCore` y permisos de lectura ECR (`AmazonEC2ContainerRegistryReadOnly`). El repositorio ECR `bitss-pagos` debe existir.
 
-## Secrets del repositorio
-
-Settings > Secrets and variables > Actions > New repository secret.
-
-| Secret | Descripción |
-| --- | --- |
-| `DOCKERHUB_USERNAME` | Usuario de Docker Hub |
-| `DOCKERHUB_TOKEN` | Access token de Docker Hub (Read & Write) |
-| `AWS_ACCESS_KEY_ID` | Credencial de AWS |
-| `AWS_SECRET_ACCESS_KEY` | Credencial de AWS |
-| `AWS_SESSION_TOKEN` | Solo si las credenciales son temporales (AWS Academy) |
-| `AWS_REGION` | Por ejemplo `us-east-1` |
-| `INSTANCE_ID` | ID de la instancia EC2 (`i-...`) |
-
-El repositorio de Docker Hub `bitss-pagos` debe ser público, o la instancia debe haber hecho `docker login` previamente.
+Antes del primer despliegue, prepara la instancia con `bitss-infra/ec2/setup-app.sh` y crea `/opt/bitss/pagos.env` a partir de `bitss-infra/config/pagos.env.example`, completando IP privada de la base de datos, credenciales y URLs internas.
 
 ## Ejecución local
 
-```bash
-docker run -d --name mysql -p 3307:3306 -e MYSQL_ROOT_PASSWORD=secret mysql:8.4
-mvn spring-boot:run
-```
-
-Las variables `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` y `BITSS_JWT_SECRET` tienen valores por defecto para desarrollo local.
+Configura las variables `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` y `BITSS_JWT_SECRET` para ejecutar la aplicación fuera de AWS.
